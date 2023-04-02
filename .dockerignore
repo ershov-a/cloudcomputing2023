@@ -1,0 +1,9 @@
+.git
+/build/CMakeFiles
+/build/Dockerfile*
+**/build-*
+**/docs/*
+**/venv/*
+**/node_modules/*
+**/__pycache__
+**/README.*

@@ -121,7 +121,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 env/
 venv/
@@ -241,3 +240,5 @@ fabric.properties
 
 log.txt
 test.py
+.env
+.appenv

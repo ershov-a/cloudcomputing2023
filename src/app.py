@@ -4,17 +4,34 @@ import os
 from pyowm.owm import OWM
 from telebot import types
 from telebot.types import ReplyKeyboardRemove
+import mysql.connector
 
-with open(os.path.dirname(os.path.realpath(__file__)) + '/.env') as file:
+# Tokens
+with open(os.path.dirname(os.path.realpath(__file__)) + '/.appenv') as file:
     API_TOKEN = file.readline().strip()
     OWM_TOKEN = file.readline().strip()
     FEEDBACK_GROUP_ID = file.readline().strip()
+    MYSQL_ROOT_PASSWORD = file.readline().strip()
 
+# Telegram bot initialization
 bot = telebot.TeleBot(API_TOKEN)
 
-logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', filename="log.txt", level=logging.DEBUG,
+# Logging config
+logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', filename="../log.txt", level=logging.DEBUG,
                     datefmt='%Y-%m-%d %H:%M:%S')
 logging.getLogger('TeleBot').setLevel(logging.DEBUG)
+
+# Database config
+db = mysql.connector.connect(host='db', user='root', password=MYSQL_ROOT_PASSWORD, port=3306, database="botdb")
+mycursor = db.cursor()
+
+
+# Increment specified command usage count
+def update_stats(command):
+    sql = "UPDATE stats SET usecount = usecount + 1 WHERE command = %s"
+    val = command
+    mycursor.execute(sql, (val,))
+    db.commit()
 
 
 # Handle '/start' and '/help'
@@ -27,12 +44,15 @@ def send_welcome(message):
 # with mock answer
 @bot.message_handler(commands=['currencies', 'news', 'brief'])
 def mock_message(message):
+    update_stats("mock")
     bot.reply_to(message, "Feature in development, try again later")
 
 
 # Handle '/weather'
 @bot.message_handler(commands=['weather'])
 def weather_message(message):
+    update_stats("weather")
+
     keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True, one_time_keyboard=True)
     button_geo = types.KeyboardButton(text="Send current location", request_location=True)
     keyboard.add(button_geo)
@@ -66,6 +86,7 @@ def weather_handle(message):
 
 @bot.message_handler(commands=['feedback'])
 def feedback_message(message):
+    update_stats("feedback")
     msg = bot.reply_to(message, "Send the message to be sent to the developer")
     bot.register_next_step_handler(msg, feedback_handle)
 
