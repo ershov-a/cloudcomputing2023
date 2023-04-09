@@ -1,3 +1,5 @@
 pyowm==3.3.0
 pyTelegramBotAPI==4.10.0
 mysql-connector-python
+feedparser
+openai
