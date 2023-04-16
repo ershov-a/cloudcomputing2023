@@ -3,3 +3,6 @@ pyTelegramBotAPI==4.10.0
 mysql-connector-python
 feedparser
 openai
+pycbrf
+pyqrcode
+pypng

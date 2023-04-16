@@ -9,6 +9,11 @@ import feedparser
 import openai
 from openai.error import RateLimitError, InvalidRequestError
 from requests.exceptions import ReadTimeout
+from pycbrf.toolbox import ExchangeRates
+import requests
+from datetime import date
+import png
+import pyqrcode
 
 # Tokens
 with open(os.path.dirname(os.path.realpath(__file__)) + '/.appenv') as file:
@@ -48,9 +53,9 @@ def send_welcome(message):
     bot.reply_to(message, "Hi, I am Info service bot. Check available commands with menu button")
 
 
-# Handle '/currencies', '/news', '/brief', '/feedback'
+# Handle '/brief'
 # with mock answer
-@bot.message_handler(commands=['currencies', 'brief'])
+@bot.message_handler(commands=['brief'])
 def mock_message(message):
     update_stats("mock")
     bot.reply_to(message, "Feature in development, try again later")
@@ -180,6 +185,55 @@ def gpt_message(message):
 
 def gpt_handle(message):
     gpt_make_request(message)
+
+
+def get_rate_cbr(currency_code):
+    today = date.today()
+    rates = ExchangeRates(str(today))
+    return round(float(rates[currency_code].rate), 2)
+
+
+def get_rate_for_symbol_binance(symbol):
+    # request url
+    url = "https://api.binance.com/api/v3/ticker/price?symbol=" + symbol
+    # request data from url
+    data = requests.get(url)
+    data = data.json()
+    return round(float(data['price']), 2)
+
+
+# Handle '/currencies'
+@bot.message_handler(commands=['currencies'])
+def feedback_message(message):
+    update_stats("currencies")
+
+    msg = "Currencies rates (CBR):\n"
+    msg += "- USD " + str(get_rate_cbr("USD")) + "\n"
+    msg += "- EUR " + str(get_rate_cbr("EUR")) + "\n"
+    msg += "- CNY " + str(get_rate_cbr("CNY")) + "\n"
+    msg += "Cryptocurrencies rates:\n"
+    msg += "- ETH/USDT " + str(get_rate_for_symbol_binance("ETHUSDT")) + "\n"
+    msg += "- BTC/USDT " + str(get_rate_for_symbol_binance("BTCUSDT")) + "\n"
+
+    bot.reply_to(message, msg)
+
+
+@bot.message_handler(commands=['generate_qr_code'])
+def qr_code_handler(message):
+    sent = bot.send_message(message.chat.id, "Answer this message with text or link to generate a qr code")
+    bot.register_next_step_handler(sent, qrcode)
+
+
+def qrcode(message):
+    qr_file = f'{message.message_id}.png'
+    try:
+        url = pyqrcode.create(message.text)
+        url.png(qr_file, scale=15)
+        bot.send_chat_action(message.chat.id, 'upload_document')
+        bot.send_document(message.chat.id, reply_to_message_id=message.message_id, document=open(qr_file, 'rb'), caption="Here is your QR code", visible_file_name="qr.png")
+        os.remove(qr_file)
+    except Exception:
+        bot.reply_to(message, "An error occurred, try again")
 
 
 @bot.message_handler(commands=['feedback'])
