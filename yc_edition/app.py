@@ -8,6 +8,8 @@ import requests
 import openai
 import pyqrcode
 import png
+import ydb
+import ydb.iam
 
 from pyowm.owm import OWM
 from telebot import types
@@ -29,6 +31,34 @@ logger = telebot.logger
 telebot.logger.setLevel(logging.INFO)
 
 bot = telebot.TeleBot(API_TOKEN, threaded=False)
+
+# YDB conection
+# Create driver in global space.
+driver = ydb.Driver(
+    endpoint=os.getenv('YDB_ENDPOINT'),
+    database=os.getenv('YDB_DATABASE'),
+    credentials=ydb.iam.MetadataUrlCredentials(),
+)
+
+# Wait for the driver to become active for requests.
+driver.wait(fail_fast=True, timeout=5)
+
+# Create the session pool instance to manage YDB sessions.
+pool = ydb.SessionPool(driver)
+
+
+# Increment specified command usage count
+def update_cmd_stats(cmd):
+    def execute_query(session):
+        # Create the transaction and execute query
+        query = "UPDATE stats SET usecount = usecount + 1 WHERE command = '%s'" % cmd
+        return session.transaction().execute(
+            query,
+            commit_tx=True,
+            settings=ydb.BaseRequestSettings().with_timeout(3).with_operation_timeout(2)
+        )
+
+    result = pool.retry_operation_sync(execute_query)
 
 
 def process_event(event):
@@ -54,14 +84,14 @@ def send_welcome(message):
 # with mock answer
 @bot.message_handler(commands=['brief'])
 def mock_message(message):
-    # update_stats("mock")
+    update_cmd_stats("mock")
     bot.reply_to(message, "Feature in development, try again later")
 
 
 # Handle '/weather'
 @bot.message_handler(commands=['weather'])
 def weather_message(message):
-    # update_stats("weather")
+    update_cmd_stats("weather")
 
     keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True, one_time_keyboard=True)
     button_geo = types.KeyboardButton(text="Send current location", request_location=True)
@@ -97,7 +127,7 @@ def weather_handle(message):
 # Handle '/news'
 @bot.message_handler(commands=['news'])
 def news_message(message):
-    # update_stats("news")
+    update_cmd_stats("news")
 
     keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True, one_time_keyboard=True)
     button_cnews = types.KeyboardButton(text="CNews")
@@ -152,7 +182,7 @@ def get_rate_for_symbol_binance(symbol):
 
 @bot.message_handler(commands=['currencies'])
 def feedback_message(message):
-    # update_stats("currencies")
+    update_cmd_stats("currencies")
 
     msg = "Currencies rates (CBR):\n"
     msg += "- USD " + str(get_rate_cbr("USD")) + "\n"
@@ -205,7 +235,7 @@ def gpt_make_request(message):
 
 @bot.message_handler(commands=['gpt'])
 def gpt_message(message):
-    # update_stats("gpt")
+    update_cmd_stats("gpt")
 
     msg = bot.send_message(message.chat.id, "Send message for ChatGPT")
     bot.register_next_step_handler(msg, gpt_handle)
@@ -218,6 +248,7 @@ def gpt_handle(message):
 # Handle '/generate_qr_code'
 @bot.message_handler(commands=['generate_qr_code'])
 def qr_code_handler(message):
+    update_cmd_stats("generate_qr_code")
     sent = bot.send_message(message.chat.id, "Answer this message with text or link to generate a qr code")
     bot.register_next_step_handler(sent, qrcode)
 
@@ -238,7 +269,7 @@ def qrcode(message):
 # Handle '/feedback'
 @bot.message_handler(commands=['feedback'])
 def feedback_message(message):
-    # update_stats("feedback")
+    update_cmd_stats("feedback")
     msg = bot.reply_to(message, "Send the message to be sent to the developer")
     bot.register_next_step_handler(msg, feedback_handle)
 
@@ -251,4 +282,5 @@ def feedback_handle(message):
 # Handle all other messages with content_type 'text' (content_types defaults to ['text'])
 @bot.message_handler(func=lambda message: True)
 def echo_message(message):
+    update_cmd_stats("unrecognized_commands")
     bot.reply_to(message, 'Command not recognised, check syntax.')

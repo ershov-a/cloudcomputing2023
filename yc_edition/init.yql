@@ -1,0 +1,24 @@
+CREATE TABLE `stats`
+(
+    `id` Uint64,
+    `command` String,
+    `usecount` Uint64,
+    PRIMARY KEY (`id`)
+);
+
+COMMIT;
+
+UPSERT INTO `stats`
+    ( `id`, `command`, `usecount` )
+VALUES
+    ( 1, 'weather', 0 ),
+    ( 2, 'gpt', 0 ),
+    ( 3, 'currencies', 0 ),
+    ( 4, 'news', 0 ),
+    ( 5, 'brief', 0 ),
+    ( 6, 'feedback', 0 ),
+    ( 7, 'mock', 0 ),
+    ( 8, 'generate_qr_code', 0 ),
+    ( 9, 'unrecognized_commands', 0 );
+
+COMMIT;
